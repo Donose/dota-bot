@@ -28,7 +28,7 @@ Herald Bot is a specialized Dota 2 companion designed to bridge your in-game mat
 - `!check`: Manually forces a check for new matches across all registered users.
 - `!help`: Displays this command list.
 
-### 🇷🇴 Romanian "Security"
+### 🇷🇴 Romanian insults
 - **Unknown Commands:** Any unrecognized command will trigger a random, aggressive **Romanian insult**.
 
 ---
