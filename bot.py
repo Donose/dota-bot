@@ -589,7 +589,7 @@ async def toxic(ctx, member: Optional[discord.Member] = None, *, message: str = 
                 await ctx.send("Ollama is offline. Go next game raki.")
 
 @bot.command()
-@commands.cooldown(1, 10, commands.BucketType.user)
+@commands.cooldown(1, 60, commands.BucketType.user)
 async def vocal(ctx, *, sound_name: Optional[str] = None):
     """Joins voice chat and plays a sound from the sound server."""
     if not ctx.author.voice:
