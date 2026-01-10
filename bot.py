@@ -394,7 +394,7 @@ async def status(ctx, member: discord.Member = None):
 
     async with aiohttp.ClientSession() as session:
         try:
-            _, _, _, player_match_data, analysis, team_stats, enemy_team_stats = await opendota.create_match_embed(
+            _, image_file, _, player_match_data, analysis, team_stats, enemy_team_stats = await opendota.create_match_embed(
                 session, steam_id, str(target.id), ctx.guild, LAST_MATCH_CACHE,
                 HERO_NAMES, HERO_IMAGE_KEYS, HERO_ROLES, config.RANK_NAMES,
                 config.MEMBER_NAMES, MESSAGES
@@ -402,12 +402,28 @@ async def status(ctx, member: discord.Member = None):
 
             hero_id = player_match_data.get('hero_id')
             h_name = HERO_NAMES.get(hero_id, "Unknown Hero")
+            h_key = HERO_IMAGE_KEYS.get(hero_id, "")
             won = (player_match_data.get('player_slot', 0) < 128) == player_match_data.get('radiant_win', False)
             
             embed = discord.Embed(
                 title=f"📊 Match Status for {target.display_name} as {h_name}",
                 color=discord.Color.blue()
             )
+
+            # Re-create image file for this embed since we can't reuse the one from create_match_embed easily 
+            # if we are discarding the original embed (which might have closed the file handle or we want to be safe)
+            # Actually, create_match_embed returns a fresh file object we haven't used yet, so we can use it.
+            # But we need to set the thumbnail url to attachment://...
+            
+            if h_key:
+                image_path = f"images/{h_key}.png"
+                if os.path.exists(image_path):
+                     # If create_match_embed returned a file, we can use it, but we need to match the filename
+                     # Let's just trust create_match_embed returned a valid file or None
+                     if image_file:
+                         embed.set_thumbnail(url=f"attachment://{image_file.filename}")
+                else:
+                    embed.set_thumbnail(url=f"https://api.opendota.com/apps/dota2/images/dota_react/heroes/{h_key}.png")
 
             kda = f"{player_match_data.get('kills', 0)}/{player_match_data.get('deaths', 0)}/{player_match_data.get('assists', 0)}"
             gpm = player_match_data.get('gold_per_min', 0)
@@ -420,39 +436,80 @@ async def status(ctx, member: discord.Member = None):
             embed.add_field(name="KDA", value=f"`{kda}`", inline=True)
             embed.add_field(name="Approximated Role", value=analysis.get('approximated_role', 'N/A'), inline=True)
 
-            embed.add_field(
-                name="Performance",
-                value=f"**GPM:** {gpm}\n"
-                      f"**XPM:** {xpm}\n"
-                      f"**Last Hits:** {lh}\n"
-                      f"**Hero Damage:** {hd}\n"
-                      f"**Tower Damage:** {td}",
-                inline=False
-            )
+            # Comparative Analysis
+            if team_stats and enemy_team_stats and team_stats.get('players') and enemy_team_stats.get('players'):
+                all_players = team_stats['players'] + enemy_team_stats['players']
+                
+                def get_rank_and_top(key, reverse=True):
+                    # Sort players by the key (descending for most stats)
+                    sorted_players = sorted(all_players, key=lambda x: x.get(key, 0), reverse=reverse)
+                    
+                    # Find user's rank
+                    rank = -1
+                    user_val = player_match_data.get(key, 0)
+                    for i, p in enumerate(sorted_players):
+                        if p.get('player_slot') == player_match_data.get('player_slot'):
+                            rank = i + 1
+                            break
+                    
+                    # Find top player details
+                    top_player = sorted_players[0]
+                    top_val = top_player.get(key, 0)
+                    top_hero_id = top_player.get('hero_id')
+                    top_hero_name = HERO_NAMES.get(top_hero_id, "Unknown")
+                    
+                    return rank, top_val, top_hero_name
 
-            # Team and Enemy Averages
-            if team_stats and enemy_team_stats:
+                # Calculate Ranks
+                gpm_rank, top_gpm, top_gpm_hero = get_rank_and_top('gold_per_min')
+                xpm_rank, top_xpm, top_xpm_hero = get_rank_and_top('xp_per_min')
+                hd_rank, top_hd, top_hd_hero = get_rank_and_top('hero_damage')
+                td_rank, top_td, top_td_hero = get_rank_and_top('tower_damage')
+                lh_rank, top_lh, top_lh_hero = get_rank_and_top('last_hits')
+                
+                # Calculate Grade (Average of ranks, lower is better)
+                # Weights: HD and TD slightly more impact than just farming? 
+                # For now simple average.
+                avg_rank = (gpm_rank + xpm_rank + hd_rank + td_rank + lh_rank) / 5
+                
+                grade = "F"
+                if avg_rank <= 2.0: grade = "S+"
+                elif avg_rank <= 3.0: grade = "S"
+                elif avg_rank <= 4.0: grade = "A"
+                elif avg_rank <= 5.5: grade = "B"
+                elif avg_rank <= 7.0: grade = "C"
+                elif avg_rank <= 8.5: grade = "D"
+                
+                embed.add_field(name="🏆 Match Grade", value=f"**{grade}** (Avg Rank: #{avg_rank:.1f}/10)", inline=False)
+
+                def format_stat(val, rank, top_val, top_hero):
+                    if rank == 1:
+                        return f"**{val}**\n🥇 Match Leader!"
+                    return f"**{val}**\nRank #{rank}\n(Top: {top_val} by {top_hero})"
+
+                embed.add_field(name="GPM", value=format_stat(gpm, gpm_rank, top_gpm, top_gpm_hero), inline=True)
+                embed.add_field(name="XPM", value=format_stat(xpm, xpm_rank, top_xpm, top_xpm_hero), inline=True)
+                embed.add_field(name="Hero Damage", value=format_stat(hd, hd_rank, top_hd, top_hd_hero), inline=True)
+                embed.add_field(name="Tower Damage", value=format_stat(td, td_rank, top_td, top_td_hero), inline=True)
+                embed.add_field(name="Last Hits", value=format_stat(lh, lh_rank, top_lh, top_lh_hero), inline=True)
+                embed.add_field(name="\u200b", value="\u200b", inline=True) # Spacer for alignment
+
+            else:
+                # Fallback if detailed stats fail
                 embed.add_field(
-                    name="Team Averages",
-                    value=f"**GPM:** {team_stats['avg_gpm']:.0f}\n"
-                          f"**XPM:** {team_stats['avg_xpm']:.0f}\n"
-                          f"**Last Hits:** {team_stats['avg_lh']:.0f}\n"
-                          f"**Hero Damage:** {team_stats['avg_hero_damage']:.0f}",
-                    inline=True
-                )
-                embed.add_field(
-                    name="Enemy Team Averages",
-                    value=f"**GPM:** {enemy_team_stats['avg_gpm']:.0f}\n"
-                          f"**XPM:** {enemy_team_stats['avg_xpm']:.0f}\n"
-                          f"**Last Hits:** {enemy_team_stats['avg_lh']:.0f}\n"
-                          f"**Hero Damage:** {enemy_team_stats['avg_hero_damage']:.0f}",
-                    inline=True
+                    name="Performance",
+                    value=f"**GPM:** {gpm}\n"
+                          f"**XPM:** {xpm}\n"
+                          f"**Last Hits:** {lh}\n"
+                          f"**Hero Damage:** {hd}\n"
+                          f"**Tower Damage:** {td}",
+                    inline=False
                 )
 
             if analysis['highlights']:
                 embed.add_field(name="📋 Match Highlights", value="\n".join(analysis['highlights']), inline=False)
 
-            await ctx.send(embed=embed)
+            await ctx.send(embed=embed, file=image_file)
 
         except opendota.NoMatchesException:
             await ctx.send(f"No recent matches found for **{target.display_name}**.")
