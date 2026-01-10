@@ -466,11 +466,27 @@ async def status(ctx, member: discord.Member = None):
                 hd_rank, top_hd, top_hd_hero = get_rank_and_top('hero_damage')
                 td_rank, top_td, top_td_hero = get_rank_and_top('tower_damage')
                 lh_rank, top_lh, top_lh_hero = get_rank_and_top('last_hits')
+                assists_rank, top_assists, top_assists_hero = get_rank_and_top('assists')
+                # For deaths, lower is better, so reverse=False
+                deaths_rank, top_deaths, top_deaths_hero = get_rank_and_top('deaths', reverse=False)
                 
-                # Calculate Grade (Average of ranks, lower is better)
-                # Weights: HD and TD slightly more impact than just farming? 
-                # For now simple average.
-                avg_rank = (gpm_rank + xpm_rank + hd_rank + td_rank + lh_rank) / 5
+                # Calculate Grade based on Role
+                role = analysis.get('approximated_role', 'Unknown')
+                
+                if role in ["Carry", "Midlaner"]:
+                    ranks_to_avg = [gpm_rank, xpm_rank, hd_rank, td_rank, lh_rank]
+                elif role == "Offlaner":
+                    # Offlaners care about impact (HD, TD, Assists) and farm (XPM, GPM)
+                    ranks_to_avg = [xpm_rank, hd_rank, td_rank, gpm_rank, assists_rank]
+                elif role == "Support":
+                    # Supports care about Assists, Survival (Deaths), Impact (HD), and Level (XPM)
+                    # We ignore GPM/LH/TD as they are not primary support jobs
+                    ranks_to_avg = [assists_rank, deaths_rank, hd_rank, xpm_rank]
+                else:
+                    # Default / Unknown
+                    ranks_to_avg = [gpm_rank, xpm_rank, hd_rank, td_rank, lh_rank]
+
+                avg_rank = sum(ranks_to_avg) / len(ranks_to_avg)
                 
                 grade = "F"
                 if avg_rank <= 2.0: grade = "S+"
