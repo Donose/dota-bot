@@ -557,7 +557,7 @@ async def vocal(ctx, *, sound_name: Optional[str] = None):
         if voice_client.is_playing():
             voice_client.stop()
 
-        # using ffmpeg filter to lower volume to 5%
+        # using ffmpeg filter to lower volume
         source = discord.FFmpegPCMAudio(file_path, options='-filter:a "volume=0.4"')
         voice_client.play(source, after=after_playing)
         await ctx.send(f"🔊 Playing `{selected_file.replace('.mp3', '')}`")
