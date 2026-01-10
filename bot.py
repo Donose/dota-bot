@@ -107,7 +107,7 @@ async def send_reminder():
     channel = bot.get_channel(config.CHANNEL_ID)
     if not channel:
         return
-    await channel.send("Sometimes valve fucks up some shit service and opendota doesn t get the fucking game stats, chill, will come later. So wait for open dota to update, when a new match is there, i will see it and post it. Stop blaming me for this shit")
+    await channel.send("Sometimes valve fucks up some shit service and OpenDota doesn't get the fucking game stats, chill, will come later. So wait for OpenDota to update, when a new match is there, i will see it and post it. Stop blaming me for this shit. Also if i restart i lose memory of last match so even though you just finished a game i will not treat it as a new game(you can still see it using !last) use !help for help...trash dog")
 
 @bot.event
 async def on_ready():
