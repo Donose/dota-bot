@@ -117,6 +117,22 @@ async def on_ready():
     check_for_new_matches.start()
     send_reminder.start()
 
+    # Join specific voice channel
+    try:
+        voice_channel = bot.get_channel(1457514629281616058)
+        if voice_channel:
+            if not voice_channel.guild.voice_client:
+                await voice_channel.connect()
+                print(f"Joined voice channel: {voice_channel.name}")
+            else:
+                 # If already connected somewhere, maybe move? or just stay if it's the right one.
+                 # For now, if connected, assume it's okay or handled elsewhere.
+                 print("Already connected to a voice channel.")
+        else:
+            print("Voice channel 1457514629281616058 not found.")
+    except Exception as e:
+        print(f"Failed to join voice channel on ready: {e}")
+
 @bot.event
 async def on_message(message):
     """Called when a message is sent in a channel the bot can see."""
@@ -613,32 +629,66 @@ async def vocal(ctx, *, sound_name: Optional[str] = None):
 
     try:
         voice_client = ctx.voice_client
-        if voice_client:
-            if voice_client.channel != channel:
-                await voice_client.move_to(channel)
-        else:
-            voice_client = await channel.connect()
-
-        def after_playing(error):
-            coro = voice_client.disconnect()
-            fut = asyncio.run_coroutine_threadsafe(coro, bot.loop)
-            try:
-                fut.result()
-            except Exception as e:
-                print(f"Error disconnecting: {e}")
+        if not voice_client:
+             if ctx.author.voice:
+                 voice_client = await channel.connect()
+             else:
+                 await ctx.send("Neither you nor I are in a voice channel.")
+                 return
+        elif voice_client.channel != channel:
+             await voice_client.move_to(channel)
 
         if voice_client.is_playing():
             voice_client.stop()
 
         # using ffmpeg filter to lower volume
         source = discord.FFmpegPCMAudio(file_path, options='-filter:a "volume=0.4"')
-        voice_client.play(source, after=after_playing)
+        voice_client.play(source)
         await ctx.send(f"🔊 Playing `{selected_file.replace('.mp3', '')}`")
         
     except Exception as e:
         await ctx.send(f"Failed to play sound: {e}")
-        if ctx.voice_client:
-            await ctx.voice_client.disconnect()
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    """
+    Event listener that triggers when a member's voice state changes.
+    Plays a random greeting when a user joins the bot's channel.
+    """
+    if member.bot:
+        return
+
+    # Check if user joined a channel or moved to a new one
+    if after.channel is not None and before.channel != after.channel:
+        voice_client = member.guild.voice_client
+        
+        # If bot is connected and the user joined the bot's channel
+        if voice_client and voice_client.channel == after.channel:
+            greetings_dir = "greetings"
+            if os.path.exists(greetings_dir):
+                # Get all files, ignoring hidden ones
+                files = [f for f in os.listdir(greetings_dir) 
+                        if os.path.isfile(os.path.join(greetings_dir, f)) and not f.startswith('.')]
+                
+                print(f"DEBUG: Found greeting files: {files}")
+
+                if files:
+                    selected_file = random.SystemRandom().choice(files)
+                    file_path = os.path.join(greetings_dir, selected_file)
+                    
+                    try:
+                        # Wait 1 second before playing greeting
+                        await asyncio.sleep(1)
+
+                        if voice_client.is_playing():
+                            voice_client.stop()
+                            
+                        # using ffmpeg filter to lower volume
+                        source = discord.FFmpegPCMAudio(file_path, options='-filter:a "volume=0.5"')
+                        voice_client.play(source)
+                        print(f"Played greeting {selected_file} for {member.display_name}")
+                    except Exception as e:
+                        print(f"Failed to play greeting: {e}")
 
 @bot.event
 async def on_command_error(ctx, error):
