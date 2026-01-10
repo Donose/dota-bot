@@ -589,6 +589,7 @@ async def toxic(ctx, member: Optional[discord.Member] = None, *, message: str = 
                 await ctx.send("Ollama is offline. Go next game raki.")
 
 @bot.command()
+@commands.cooldown(1, 10, commands.BucketType.user)
 async def vocal(ctx, *, sound_name: Optional[str] = None):
     """Joins voice chat and plays a sound from the sound server."""
     if not ctx.author.voice:
@@ -684,7 +685,7 @@ async def on_voice_state_update(member, before, after):
                             voice_client.stop()
                             
                         # using ffmpeg filter to lower volume
-                        source = discord.FFmpegPCMAudio(file_path, options='-filter:a "volume=0.5"')
+                        source = discord.FFmpegPCMAudio(file_path, options='-filter:a "volume=0.4"')
                         voice_client.play(source)
                         print(f"Played greeting {selected_file} for {member.display_name}")
                     except Exception as e:
@@ -696,6 +697,8 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         if SLANGS:
             await ctx.send(random.choice(SLANGS))
+    elif isinstance(error, commands.CommandOnCooldown):
+        await ctx.send(f"Usor in pula mea, mai asteapta {error.retry_after:.1f}s, in slbz sa te bata.")
     else:
         print(f"An unhandled error occurred: {error}")
 
