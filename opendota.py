@@ -252,6 +252,20 @@ async def create_match_embed(session: aiohttp.ClientSession, steam_id: str, disc
 
     embed = discord.Embed(title=f"🚨 {analysis['status']}", color=analysis['color'])
     embed.description = f"{mention_text} just played as **{h_name}**.\n**{flavor}**"
+    
+    # Set Steam Avatar and Name
+    try:
+        steam_profile = p_data.get('profile', {})
+        steam_name = steam_profile.get('personaname', friendly_name)
+        avatar_url = steam_profile.get('avatarfull')
+        
+        if avatar_url:
+            embed.set_author(name=steam_name, icon_url=avatar_url, url=steam_profile.get('profileurl', ''))
+        else:
+            embed.set_author(name=steam_name)
+    except Exception as e:
+        print(f"Error setting author in embed: {e}")
+        embed.set_author(name=friendly_name)
 
     image_file = None
     if h_key:
