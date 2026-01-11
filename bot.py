@@ -176,20 +176,35 @@ async def check_for_new_matches():
     async with aiohttp.ClientSession() as session:
         for discord_id, steam_id in user_map.items():
             try:
+                # Pass the last seen match ID to avoid unnecessary API calls
+                last_id = last_seen_matches.get(steam_id)
                 embed, image_file, m_id, player_match_data, analysis, _, _ = await opendota.create_match_embed(
                     session, steam_id, discord_id, guild, LAST_MATCH_CACHE,
                     HERO_NAMES, HERO_IMAGE_KEYS, HERO_ROLES, config.RANK_NAMES, 
-                    config.MEMBER_NAMES, MESSAGES
+                    config.MEMBER_NAMES, MESSAGES, last_known_match_id=last_id
                 )
                 
-                if embed and m_id and last_seen_matches.get(steam_id) != m_id:
+                # Update the cache with the latest match ID, even if we skipped details
+                if m_id:
+                     last_seen_matches[steam_id] = m_id
+
+                if embed and m_id:
+                    # If embed is returned, it means it's a new match (or first run)
                     DETAILED_LAST_MATCH_CACHE[discord_id] = (player_match_data, analysis)
-                    if steam_id not in last_seen_matches:
-                        last_seen_matches[steam_id] = m_id
-                        continue
+                    # Only send if it wasn't the very first check to avoid spamming on restart 
+                    # (Unless we want to see the last match on restart? logic below handles "new match" check)
+                    # Actually, create_match_embed only returns embed if last_known_match_id didn't match.
+                    # But if last_known_match_id was None (first run), it returns embed.
+                    # We might want to suppress printing on the very first run unless we want it.
+                    # The original logic had: if embed and m_id and last_seen_matches.get(steam_id) != m_id:
+                    # But we just updated last_seen_matches above.
+                    # Let's check against `last_id` (the value BEFORE the call).
                     
-                    last_seen_matches[steam_id] = m_id
-                    await channel.send(embed=embed, file=image_file)
+                    if last_id and str(m_id) != str(last_id):
+                         await channel.send(embed=embed, file=image_file)
+                    elif not last_id:
+                         # First run ever for this session. Just cache it, don't spam.
+                         pass
 
             except opendota.RateLimitException:
                 print("Rate limit reached during background check. Will try again later.")

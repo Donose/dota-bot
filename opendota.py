@@ -167,11 +167,12 @@ def calculate_team_metrics(players):
     
     return metrics
 
-async def create_match_embed(session: aiohttp.ClientSession, steam_id: str, discord_id: str, guild: discord.Guild, last_match_cache, hero_names, hero_image_keys, hero_roles, rank_names_map, member_names_map, messages_map):
+async def create_match_embed(session: aiohttp.ClientSession, steam_id: str, discord_id: str, guild: discord.Guild, last_match_cache, hero_names, hero_image_keys, hero_roles, rank_names_map, member_names_map, messages_map, last_known_match_id=None):
     """
     Fetches the latest match for a user, processes it, and creates a Discord embed.
     Raises exceptions for API errors, rate limits, or no data.
     Returns the embed, an image file (if any), and the match ID on success.
+    If last_known_match_id is provided and matches the latest match, returns None for embed/image.
     """
     recent_matches_url = f"https://api.opendota.com/api/players/{steam_id}/recentMatches"
     async with session.get(recent_matches_url, timeout=10) as r_match:
@@ -184,6 +185,10 @@ async def create_match_embed(session: aiohttp.ClientSession, steam_id: str, disc
             raise NoMatchesException("No recent matches found.")
     
     m_id = m_data[0]['match_id']
+
+    # Optimization: Skip detailed fetch if match hasn't changed
+    if last_known_match_id and str(m_id) == str(last_known_match_id):
+        return None, None, m_id, None, None, None, None
 
     player_url = f"https://api.opendota.com/api/players/{steam_id}"
     p_data = {}
