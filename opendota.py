@@ -77,7 +77,7 @@ def get_match_analysis(player_match_data, won, team_stats, enemy_team_stats, her
     if not won:
         if kda >= 2.5:
             base_status, base_color, base_msg_key = "ZOO KEEPER ALERT", 0xf1c40f, "uncarryable"
-        elif kda >= 1.2:
+        elif kda >= 1.4:
             base_status, base_color, base_msg_key = "DID HIS BEST ALERT", 0xe67e22, "tried_hard"
         else:
             base_status, base_color, base_msg_key = "FEEDER ALERT", 0xe74c3c, "feeder"
@@ -86,7 +86,7 @@ def get_match_analysis(player_match_data, won, team_stats, enemy_team_stats, her
             base_status, base_color, base_msg_key = "SMURF ALERT", 0x2ecc71, "smurf_alert"
         elif assists >= 23 and deaths <= 6:
             base_status, base_color, base_msg_key = "SUPPORT SMURF ALERT", 0x1abc9c, "super_support"
-        elif kda >= 1.2:
+        elif kda >= 1.4:
             base_status, base_color, base_msg_key = "SOLID PERFORMANCE ALERT", 0x1abc9c, "solid_performance"
         else:
             base_status, base_color, base_msg_key = "PASSENGER ALERT", 0x3498db, "carried"

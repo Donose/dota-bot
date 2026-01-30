@@ -101,7 +101,7 @@ async def list_sounds(ctx):
     await ctx.send(embed=embed)
 
 
-@tasks.loop(hours=4)
+@tasks.loop(hours=24)
 async def send_reminder():
     """Sends a reminder message to the channel."""
     channel = bot.get_channel(config.CHANNEL_ID)
@@ -153,7 +153,7 @@ async def on_message(message):
         now = datetime.utcnow()
         last_post_time = channel_last_help_post_time[channel_id]
 
-        if last_post_time is None or (now - last_post_time) > timedelta(hours=1):
+        if last_post_time is None or (now - last_post_time) > timedelta(hours=10):
             # Reset counter and post help message
             channel_message_counts[channel_id] = 0
             channel_last_help_post_time[channel_id] = now
@@ -568,7 +568,7 @@ async def status(ctx, member: discord.Member = None):
 async def toxic(ctx, member: Optional[discord.Member] = None, *, message: str = ""):
     """Roasts the user using the toxic-dota model."""
     async with ctx.typing():
-        url = "http://host.docker.internal:11434/api/generate"
+        url = "http://7d049e68e01f:11434/api/generate"
         target = member or (ctx.message.mentions[0] if ctx.message.mentions else ctx.author)
         user_id = str(target.id)
         stats = LAST_MATCH_CACHE.get(user_id, "Player is a coward with no data")
@@ -580,7 +580,7 @@ async def toxic(ctx, member: Optional[discord.Member] = None, *, message: str = 
       
         rich_prompt = (f"Context: {stats}\nHistory: {history_text}\nPlayer said: {message}\nInsult:")
         payload = {
-            "model": "toxic-dota", "prompt": rich_prompt, "stream": False,
+            "model": "rude-bot", "prompt": rich_prompt, "stream": False,
             "options": {
                 "num_predict": 60, "temperature": 1.5, "repeat_penalty": 1.4,
                 "num_ctx": 2048, "stop": ["MESSAGE:", "RECENT_HISTORY:", "User:", "FLAME:", "TARGET_STATS:"]
